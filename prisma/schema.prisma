@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model QuestionBank {
+  id        String   @id @default(uuid())
+  title     String
+  createdAt DateTime @default(now())
+  questions Question[]
+  sessions  PracticeSession[]
+}
+
+model Question {
+  id          String           @id @default(uuid())
+  bankId      String
+  bank        QuestionBank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  type        String           // single_choice | multiple_choice | true_false | fill_blank
+  stem        String
+  options     String           @default("[]") // JSON: [{key, content}]
+  answer      String           @default("[]") // JSON: ["A"] or ["对"] etc.
+  analysis    String?
+  orderIndex  Int
+  rawText     String?
+  confidence  Float            @default(1.0)
+  createdAt   DateTime         @default(now())
+
+  answers       PracticeAnswer[]
+  wrongStates   WrongQuestion[]
+
+  @@index([bankId])
+}
+
+model PracticeSession {
+  id            String           @id @default(uuid())
+  bankId        String
+  bank          QuestionBank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  mode          String           // sequential | random | wrong
+  questionIds   String           // JSON: ["qid1", "qid2", ...]
+  totalCount    Int
+  correctCount  Int              @default(0)
+  currentIndex  Int              @default(0)
+  startedAt     DateTime         @default(now())
+  finishedAt    DateTime?
+
+  answers       PracticeAnswer[]
+
+  @@index([bankId])
+}
+
+model PracticeAnswer {
+  id          String           @id @default(uuid())
+  sessionId   String
+  session     PracticeSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question         @relation(fields: [questionId], references: [id])
+  userAnswer  String           // JSON: ["A"] or ["填空文本"]
+  isCorrect   Boolean
+  durationMs  Int              @default(0)
+  answeredAt  DateTime         @default(now())
+
+  @@index([sessionId])
+  @@index([questionId])
+}
+
+model WrongQuestion {
+  id          String   @id @default(uuid())
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  wrongCount  Int      @default(1)
+  lastWrongAt DateTime @default(now())
+
+  @@unique([questionId])
+}

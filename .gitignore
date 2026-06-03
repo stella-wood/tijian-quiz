@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# environment variables
+.env
+
+# Next.js build output
+.next/
+
+# database files (contain user data — SQLite resolves relative to schema)
+prisma/dev.db
+
+# uploaded files
+uploads/
+
+# auto-generated
+AGENTS.md
+
+# design / planning documents (not source code)
+question-practice-app-architecture.md
+v1-simplified-plan.md
+
+# test files / user content
+腾讯云*.md
+*.tmp
