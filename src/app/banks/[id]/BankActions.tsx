@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
+interface UnfinishedSession {
+  id: string;
+  mode: string;
+  currentIndex: number;
+  totalCount: number;
+  startedAt: string;
+}
 
 export function BankActions({
   bankId,
@@ -12,6 +20,21 @@ export function BankActions({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const [unfinished, setUnfinished] = useState<UnfinishedSession | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/banks/${bankId}/sessions/unfinished`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0 && !data[0].error) {
+          setUnfinished(data[0]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, [bankId]);
 
   async function startPractice(mode: string) {
     setLoading(mode);
@@ -33,17 +56,55 @@ export function BankActions({
     }
   }
 
+  if (questionCount === 0) {
+    return <p className="text-sm text-gray-400 py-4">导入题目后即可开始练习</p>;
+  }
+
+  if (checking) {
+    return <p className="text-sm text-gray-400 py-4">检查中...</p>;
+  }
+
+  if (unfinished && !dismissed) {
+    const modeLabel: Record<string, string> = {
+      sequential: "顺序练习",
+      random: "随机练习",
+      wrong: "错题重练",
+    };
+    const progress = Math.round(
+      (unfinished.currentIndex / unfinished.totalCount) * 100
+    );
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <p className="font-medium text-sm text-amber-900 mb-1">
+          检测到未完成的练习
+        </p>
+        <p className="text-sm text-amber-700 mb-3">
+          {modeLabel[unfinished.mode] ?? unfinished.mode}
+          {" · "}进度：{unfinished.currentIndex}/{unfinished.totalCount} ({progress}%)
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => router.push(`/practice/${unfinished.id}`)}
+            className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700 transition-colors"
+          >
+            继续练习
+          </button>
+          <button
+            onClick={() => setDismissed(true)}
+            className="bg-white border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            重新开始
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const buttons = [
     { mode: "sequential", label: "顺序练习", desc: "按题目顺序依次作答" },
     { mode: "random", label: "随机练习", desc: "乱序抽取题目" },
     { mode: "wrong", label: "错题重练", desc: "只练错过的题目" },
   ];
-
-  if (questionCount === 0) {
-    return (
-      <p className="text-sm text-gray-400 py-4">导入题目后即可开始练习</p>
-    );
-  }
 
   return (
     <div className="flex flex-wrap gap-3">

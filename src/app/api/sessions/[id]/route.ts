@@ -11,7 +11,12 @@ export async function GET(
       where: { id },
       include: {
         bank: { select: { title: true } },
-        answers: true,
+        answers: {
+          include: {
+            question: true,
+          },
+          orderBy: { answeredAt: "asc" },
+        },
       },
     });
     if (!session) {

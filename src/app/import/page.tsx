@@ -14,6 +14,29 @@ export default function ImportPage() {
   const [bankTitle, setBankTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+
+  function toggleSelect(orderIndex: number) {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderIndex)) next.delete(orderIndex);
+      else next.add(orderIndex);
+      return next;
+    });
+  }
+
+  function selectLowConfidence() {
+    const lowSet = new Set<number>();
+    questions.forEach((q) => {
+      if (q.confidence < 0.4) lowSet.add(q.orderIndex);
+    });
+    setSelectedIndices(lowSet);
+  }
+
+  function batchDelete() {
+    setQuestions((prev) => prev.filter((q) => !selectedIndices.has(q.orderIndex)));
+    setSelectedIndices(new Set());
+  }
 
   async function handleParse() {
     if (!file) return;
@@ -49,6 +72,27 @@ export default function ImportPage() {
 
   function removeQuestion(index: number) {
     setQuestions((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addOption(index: number) {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== index) return q;
+        if (q.options.length >= 5) return q;
+        const nextKey = String.fromCharCode(65 + q.options.length);
+        return { ...q, options: [...q.options, { key: nextKey, content: "" }] };
+      })
+    );
+  }
+
+  function removeOption(index: number) {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== index) return q;
+        if (q.options.length <= 2) return q;
+        return { ...q, options: q.options.slice(0, -1) };
+      })
+    );
   }
 
   async function handleSave() {
@@ -188,6 +232,20 @@ export default function ImportPage() {
                 共 {questions.length} 道题目
               </span>
               <button
+                onClick={selectLowConfidence}
+                className="text-sm text-orange-500 hover:text-orange-700"
+              >
+                选中低置信度
+              </button>
+              {selectedIndices.size > 0 && (
+                <button
+                  onClick={batchDelete}
+                  className="text-sm text-red-500 hover:text-red-700"
+                >
+                  批量删除 ({selectedIndices.size})
+                </button>
+              )}
+              <button
                 onClick={() => {
                   setQuestions([]);
                   setParseErrors([]);
@@ -195,7 +253,7 @@ export default function ImportPage() {
                 }}
                 className="text-sm text-gray-500 hover:text-gray-700"
               >
-                重新选择文件
+                重新选择
               </button>
               <button
                 onClick={handleSave}
@@ -212,6 +270,12 @@ export default function ImportPage() {
               <div key={i} className="bg-white rounded-lg border p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIndices.has(q.orderIndex)}
+                      onChange={() => toggleSelect(q.orderIndex)}
+                      className="w-4 h-4 rounded accent-blue-600 shrink-0"
+                    />
                     <span className="text-sm font-medium text-gray-500">
                       #{q.orderIndex}
                     </span>
@@ -266,6 +330,27 @@ export default function ImportPage() {
                         />
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {q.options.length > 0 && (
+                  <div className="flex gap-3 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => addOption(i)}
+                      disabled={q.options.length >= 5}
+                      className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      + 添加选项
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeOption(i)}
+                      disabled={q.options.length <= 2}
+                      className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      - 删除选项
+                    </button>
                   </div>
                 )}
 
