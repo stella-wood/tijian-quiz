@@ -4,6 +4,10 @@ function normalize(str: string): string {
   return str.trim().toLowerCase();
 }
 
+function normalizeChoice(str: string | undefined): string {
+  return (str ?? "").trim().toUpperCase();
+}
+
 export function judgeAnswer(
   type: QuestionType,
   userAnswer: string[],
@@ -11,11 +15,11 @@ export function judgeAnswer(
 ): boolean {
   switch (type) {
     case "single_choice": {
-      return userAnswer[0] === standardAnswer[0];
+      return normalizeChoice(userAnswer[0]) === normalizeChoice(standardAnswer[0]);
     }
     case "multiple_choice": {
-      const ua = [...userAnswer].sort();
-      const sa = [...standardAnswer].sort();
+      const ua = userAnswer.map(normalizeChoice).sort();
+      const sa = standardAnswer.map(normalizeChoice).sort();
       return ua.length === sa.length && ua.every((v, i) => v === sa[i]);
     }
     case "true_false": {

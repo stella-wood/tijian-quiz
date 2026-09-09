@@ -1,5 +1,5 @@
 import type { ParsedQuestion, ParseResult } from "@/types";
-import { normalizeText, BLANK_RE } from "./rules";
+import { normalizeText } from "./rules";
 import { splitQuestions } from "./splitter";
 import { classifyQuestion } from "./classifier";
 
@@ -9,6 +9,8 @@ import { classifyQuestion } from "./classifier";
  */
 function stripMarkdown(text: string): string {
   return text
+    // Remove images before links because image syntax also contains [text](url)
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     // Remove heading markers but keep the text
     .replace(/^#{1,6}\s+/gm, "")
     // Remove bold/italic markers
@@ -30,9 +32,7 @@ function stripMarkdown(text: string): string {
     // Remove blockquote markers
     .replace(/^\s*>\s+/gm, "")
     // Remove link syntax: [text](url) → text
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    // Remove images: ![alt](url) → alt
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1");
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 }
 
 /**

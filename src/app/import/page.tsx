@@ -3,39 +3,43 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ParsedQuestion, QuestionType } from "@/types";
+import { commitImport, parseQuestionFile } from "@/features/import/client";
+
+interface PreviewQuestion extends ParsedQuestion {
+  previewId: string;
+}
 
 export default function ImportPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
-  const [questions, setQuestions] = useState<ParsedQuestion[]>([]);
+  const [questions, setQuestions] = useState<PreviewQuestion[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
-  const [filename, setFilename] = useState("");
   const [bankTitle, setBankTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  function toggleSelect(orderIndex: number) {
-    setSelectedIndices((prev) => {
+  function toggleSelect(previewId: string) {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(orderIndex)) next.delete(orderIndex);
-      else next.add(orderIndex);
+      if (next.has(previewId)) next.delete(previewId);
+      else next.add(previewId);
       return next;
     });
   }
 
   function selectLowConfidence() {
-    const lowSet = new Set<number>();
+    const lowSet = new Set<string>();
     questions.forEach((q) => {
-      if (q.confidence < 0.4) lowSet.add(q.orderIndex);
+      if (q.confidence < 0.4) lowSet.add(q.previewId);
     });
-    setSelectedIndices(lowSet);
+    setSelectedIds(lowSet);
   }
 
   function batchDelete() {
-    setQuestions((prev) => prev.filter((q) => !selectedIndices.has(q.orderIndex)));
-    setSelectedIndices(new Set());
+    setQuestions((prev) => prev.filter((q) => !selectedIds.has(q.previewId)));
+    setSelectedIds(new Set());
   }
 
   async function handleParse() {
@@ -44,18 +48,13 @@ export default function ImportPage() {
     setError("");
     setParseErrors([]);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/import/parse", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "解析失败");
-      setQuestions(data.questions);
+      const data = await parseQuestionFile(file);
+      setQuestions(data.questions.map((question) => ({ ...question, previewId: crypto.randomUUID() })));
       setParseErrors(data.parseErrors || []);
-      setFilename(data.filename);
       setBankTitle(data.filename.replace(/\.(txt|md)$/i, ""));
     } catch (e) {
       if (e instanceof TypeError && e.message === "Failed to fetch") {
-        setError("无法连接到服务器，请确保已运行 start.bat 启动了服务");
+        setError("无法连接到服务器，请确保已运行“启动.bat”启动服务");
       } else {
         setError(e instanceof Error ? e.message : "解析失败");
       }
@@ -78,7 +77,7 @@ export default function ImportPage() {
     setQuestions((prev) =>
       prev.map((q, i) => {
         if (i !== index) return q;
-        if (q.options.length >= 5) return q;
+        if (q.options.length >= 26) return q;
         const nextKey = String.fromCharCode(65 + q.options.length);
         return { ...q, options: [...q.options, { key: nextKey, content: "" }] };
       })
@@ -107,38 +106,11 @@ export default function ImportPage() {
     setSaving(true);
     setError("");
     try {
-      // Create bank
-      const bankRes = await fetch("/api/banks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: bankTitle.trim() }),
+      const result = await commitImport({
+        title: bankTitle.trim(),
+        questions,
       });
-      if (!bankRes.ok) throw new Error("创建题库失败");
-      const bank = await bankRes.json();
-
-      // Create questions
-      for (const q of questions) {
-        const qRes = await fetch("/api/questions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bankId: bank.id,
-            type: q.type,
-            stem: q.stem,
-            options: q.options,
-            answer: q.answer,
-            analysis: q.analysis,
-            orderIndex: q.orderIndex,
-            rawText: q.rawText,
-            confidence: q.confidence,
-          }),
-        });
-        if (!qRes.ok) {
-          const errData = await qRes.json();
-          throw new Error(errData.error || "创建题目失败");
-        }
-      }
-      router.push(`/banks/${bank.id}`);
+      router.push(`/banks/${result.bankId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败");
     } finally {
@@ -215,7 +187,7 @@ export default function ImportPage() {
       {/* Step 2: Preview & Edit */}
       {questions.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <label className="text-sm font-medium text-gray-700">
                 题库名称
@@ -227,7 +199,7 @@ export default function ImportPage() {
                 placeholder="输入题库名称"
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-gray-500">
                 共 {questions.length} 道题目
               </span>
@@ -237,12 +209,12 @@ export default function ImportPage() {
               >
                 选中低置信度
               </button>
-              {selectedIndices.size > 0 && (
+              {selectedIds.size > 0 && (
                 <button
                   onClick={batchDelete}
                   className="text-sm text-red-500 hover:text-red-700"
                 >
-                  批量删除 ({selectedIndices.size})
+                  批量删除 ({selectedIds.size})
                 </button>
               )}
               <button
@@ -267,13 +239,13 @@ export default function ImportPage() {
 
           <div className="space-y-4">
             {questions.map((q, i) => (
-              <div key={i} className="bg-white rounded-lg border p-4">
+              <div key={q.previewId} className="bg-white rounded-lg border p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={selectedIndices.has(q.orderIndex)}
-                      onChange={() => toggleSelect(q.orderIndex)}
+                      checked={selectedIds.has(q.previewId)}
+                      onChange={() => toggleSelect(q.previewId)}
                       className="w-4 h-4 rounded accent-blue-600 shrink-0"
                     />
                     <span className="text-sm font-medium text-gray-500">
@@ -338,7 +310,7 @@ export default function ImportPage() {
                     <button
                       type="button"
                       onClick={() => addOption(i)}
-                      disabled={q.options.length >= 5}
+                      disabled={q.options.length >= 26}
                       className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       + 添加选项

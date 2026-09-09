@@ -1,20 +1,10 @@
-export type QuestionType =
-  | "single_choice"
-  | "multiple_choice"
-  | "true_false"
-  | "fill_blank";
+export {
+  TYPE_LABEL,
+  type Option,
+  type QuestionType,
+} from "@/features/questions/contracts";
 
-export const TYPE_LABEL: Record<QuestionType, string> = {
-  single_choice: "单选题",
-  multiple_choice: "多选题",
-  true_false: "判断题",
-  fill_blank: "填空题",
-};
-
-export interface Option {
-  key: string;
-  content: string;
-}
+import type { Option, QuestionType } from "@/features/questions/contracts";
 
 export interface ParsedQuestion {
   type: QuestionType;
@@ -31,4 +21,3 @@ export interface ParseResult {
   questions: ParsedQuestion[];
   parseErrors: string[];
 }
-

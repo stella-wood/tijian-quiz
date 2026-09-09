@@ -1,9 +1,2 @@
-import { PrismaClient } from "@prisma/client";
-
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+/** @deprecated 数据访问应通过 feature service；仅保留兼容出口。 */
+export { prisma } from "@/server/prisma";

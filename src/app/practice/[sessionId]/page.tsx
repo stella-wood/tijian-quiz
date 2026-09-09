@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import type { Option, QuestionType } from "@/types";
 import { TYPE_LABEL } from "@/types";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { getSession, submitAnswer } from "@/features/practice/client";
 
 interface Question {
   id: string;
@@ -53,44 +55,34 @@ export default function PracticePage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [startTime, setStartTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(0);
   const [answeredHistory, setAnsweredHistory] = useState<HistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const [showQuestionList, setShowQuestionList] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const submittedRef = useRef(false);
 
-  useEffect(() => {
-    fetchSession();
-  }, [sessionId]);
-
-  async function fetchSession() {
+  const fetchSession = useCallback(async () => {
     try {
-      const res = await fetch(`/api/sessions/${sessionId}`);
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `HTTP ${res.status}`);
+      setLoadError("");
+      const data = await getSession(sessionId);
+      if (data.status === "completed" && !submittedRef.current) {
+        router.replace(`/practice/report?sessionId=${sessionId}`);
+        return;
       }
-      const data = await res.json();
       setSession(data);
       setStartTime(Date.now());
 
       // Rebuild answeredHistory from existing answers
       if (data.answers && Array.isArray(data.answers)) {
-        const history: HistoryEntry[] = data.answers.map((a: Record<string, unknown>) => {
-          const q = a.question as Record<string, unknown> | undefined;
+        const history: HistoryEntry[] = data.answers.map((answer) => {
           return {
-            question: {
-              id: q?.id as string,
-              type: q?.type as QuestionType,
-              stem: q?.stem as string,
-              options: typeof q?.options === "string" ? JSON.parse(q.options as string) : (q?.options ?? []),
-              answer: typeof q?.answer === "string" ? JSON.parse(q.answer as string) : [],
-              analysis: (q?.analysis as string) ?? null,
-            },
-            userAnswer: typeof a.userAnswer === "string" ? JSON.parse(a.userAnswer as string) : [],
+            question: answer.question,
+            userAnswer: answer.userAnswer,
             result: {
-              correct: a.isCorrect as boolean,
-              standardAnswer: typeof q?.answer === "string" ? JSON.parse(q.answer as string) : [],
-              analysis: (q?.analysis as string) ?? null,
+              correct: answer.isCorrect,
+              standardAnswer: answer.question.answer,
+              analysis: answer.question.analysis,
             },
           };
         });
@@ -99,12 +91,18 @@ export default function PracticePage() {
       }
     } catch (e) {
       console.error("获取会话失败:", e);
+      setLoadError(e instanceof Error ? e.message : "获取会话失败");
     } finally {
       setLoading(false);
     }
-  }
+  }, [router, sessionId]);
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchSession);
+  }, [fetchSession]);
 
   function resetForNext() {
+    submittedRef.current = false;
     setSelected([]);
     setFillText("");
     setSubmitted(false);
@@ -112,8 +110,7 @@ export default function PracticePage() {
     setStartTime(Date.now());
   }
 
-  const handleSelect = useCallback(
-    (key: string) => {
+  function handleSelect(key: string) {
       if (submitted || !session?.currentQuestion) return;
       const type = session.currentQuestion.type;
       if (type === "single_choice" || type === "true_false") {
@@ -123,9 +120,7 @@ export default function PracticePage() {
           prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
         );
       }
-    },
-    [submitted, session?.currentQuestion]
-  );
+  }
 
   async function handleSubmit() {
     if (!session?.currentQuestion) return;
@@ -136,21 +131,13 @@ export default function PracticePage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/answer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userAnswer,
-          durationMs: Date.now() - startTime,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await submitAnswer(sessionId, userAnswer, Date.now() - startTime);
       setResult({
         correct: data.isCorrect,
         standardAnswer: data.standardAnswer,
         analysis: data.analysis,
       });
+      submittedRef.current = true;
       setSubmitted(true);
 
       if (session?.currentQuestion) {
@@ -224,6 +211,10 @@ export default function PracticePage() {
 
   if (loading) {
     return <div className="text-center py-20 text-gray-500">加载中...</div>;
+  }
+
+  if (loadError) {
+    return <div className="mx-auto max-w-2xl py-10"><ErrorBanner message={loadError} /></div>;
   }
 
   if (!session?.currentQuestion && !submitted && answeredHistory.length === 0) {
@@ -423,7 +414,7 @@ export default function PracticePage() {
             <div className="mb-6">
               <input
                 type="text"
-                value={fillText}
+                value={effectiveEntry ? effectiveSelected.join("、") : fillText}
                 onChange={(e) => setFillText(e.target.value)}
                 disabled={effectiveSubmitted}
                 placeholder="请输入答案"

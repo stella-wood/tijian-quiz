@@ -9,16 +9,28 @@ node_modules/
 
 # database files (contain user data — SQLite resolves relative to schema)
 prisma/dev.db
+prisma/*.db.bak-*
+prisma/test.db*
+prisma/e2e.db*
+prisma/legacy-test.db*
+prisma/e2e-server.pid
+
+# test artifacts
+test-results/
+playwright-report/
+coverage/
 
 # uploaded files
 uploads/
 
 # auto-generated
 AGENTS.md
+next-env.d.ts
 
 # design / planning documents (not source code)
 question-practice-app-architecture.md
 v1-simplified-plan.md
+.notes/
 
 # test files / user content
 

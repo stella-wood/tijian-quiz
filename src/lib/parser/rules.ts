@@ -69,4 +69,4 @@ export const ANALYSIS_PATTERNS: { regex: RegExp; contentGroup: number }[] = [
 
 // ── Fill-blank markers in stem ──
 
-export const BLANK_RE = /[（(]\s*[）)]|_{2,}|_{2,}|____|\.{4,}|【\s*】|（\s*）/;
+export const BLANK_RE = /[（(]\s*[）)]|_{2,}|\.{4,}|【\s*】/;

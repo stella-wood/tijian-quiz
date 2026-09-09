@@ -1,23 +1,13 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { BankIdSchema } from "@/features/banks/contracts";
+import { parseWithSchema, routeError } from "@/server/http";
+import { practiceService } from "@/server/services";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params;
-    const sessions = await prisma.practiceSession.findMany({
-      where: {
-        bankId: id,
-        finishedAt: null,
-      },
-      orderBy: { startedAt: "desc" },
-      take: 5,
-    });
-    return NextResponse.json(sessions);
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "服务器内部错误" }, { status: 500 });
+    const id = parseWithSchema(BankIdSchema, (await params).id);
+    return NextResponse.json(await practiceService.getUnfinished(id));
+  } catch (error) {
+    return routeError(error);
   }
 }

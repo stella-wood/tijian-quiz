@@ -2,36 +2,20 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import type { QuestionType } from "@/types";
 import { TYPE_LABEL } from "@/types";
-import { safeJsonParse } from "@/lib/safe-json";
-
-interface WrongQuestionData {
-  id: string;
-  questionId: string;
-  wrongCount: number;
-  lastWrongAt: string;
-  question: {
-    id: string;
-    bankId: string;
-    type: QuestionType;
-    stem: string;
-    options: string;
-    answer: string;
-    analysis: string | null;
-    bank: { id: string; title: string };
-  };
-}
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { getWrongQuestions, type WrongQuestionView } from "@/features/practice/client";
 
 export default function WrongQuestionsPage() {
-  const [wrongQuestions, setWrongQuestions] = useState<WrongQuestionData[]>([]);
+  const [wrongQuestions, setWrongQuestions] = useState<WrongQuestionView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/wrong-questions")
-      .then((res) => res.json())
+    getWrongQuestions()
       .then((data) => setWrongQuestions(data))
-      .catch(console.error)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "加载错题失败"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -43,16 +27,15 @@ export default function WrongQuestionsPage() {
     <div>
       <h1 className="text-xl font-bold mb-6">错题本</h1>
 
+      {error && <div className="mb-4"><ErrorBanner message={error} /></div>}
+
       {wrongQuestions.length === 0 ? (
-        <div className="text-center py-20 text-gray-500">
-          <p className="text-lg mb-2">还没有错题</p>
-          <p className="text-sm">继续练习，做错的题目会自动记录在这里</p>
-        </div>
+        <EmptyState title="还没有错题" description="继续练习，做错的题目会自动记录在这里" />
       ) : (
         <div className="space-y-3">
           {wrongQuestions.map((wq) => {
-            const options = safeJsonParse<{ key: string; content: string }[]>(wq.question.options, []);
-            const answer = safeJsonParse<string[]>(wq.question.answer, []);
+            const options = wq.question.options;
+            const answer = wq.question.answer;
             return (
               <div key={wq.id} className="bg-white rounded-lg border p-4">
                 <div className="flex items-start justify-between mb-2">

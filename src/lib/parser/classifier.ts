@@ -26,7 +26,7 @@ function extractInlineOptions(line: string): Option[] | null {
   const re = new RegExp(INLINE_OPTION_RE.source, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(line)) !== null) {
-    opts.push({ key: m[1], content: m[2].trim() });
+    opts.push({ key: m[1].toUpperCase(), content: m[2].trim() });
   }
   return opts.length >= 2 ? opts : null;
 }
@@ -39,7 +39,7 @@ function matchOptionLine(line: string): { key: string; content: string } | null 
     const m = line.match(pattern.regex);
     if (m) {
       return {
-        key: m[pattern.keyGroup],
+        key: m[pattern.keyGroup].toUpperCase(),
         content: line.replace(pattern.regex, "").trim(),
       };
     }
@@ -57,9 +57,12 @@ function matchAnswerLine(line: string): string[] | null {
       const raw = m[pattern.contentGroup].trim();
       // Split: "A,B" "A、B" "A B" "AB" "A和B" "A与B"
       if (/^[A-Za-z]+$/.test(raw) && raw.length > 1 && raw.length <= 6) {
-        return raw.split("");
+        return raw.toUpperCase().split("");
       }
-      return raw.split(/[,，、\s和与&]+/).filter(Boolean);
+      return raw
+        .split(/[,，、\s和与&]+/)
+        .map((value) => (/^[A-Za-z]$/.test(value) ? value.toUpperCase() : value.trim()))
+        .filter(Boolean);
     }
   }
   return null;
@@ -182,6 +185,13 @@ export function classifyQuestion(blockText: string): ClassifiedBlock {
   // Determine question type
   const type = inferType(options, answer, stem);
 
+  if (type === "true_false" && options.length === 0) {
+    options.push(
+      { key: "对", content: "对" },
+      { key: "错", content: "错" }
+    );
+  }
+
   return { stem, options, answer, analysis, type, rawText: blockText };
 }
 
@@ -220,6 +230,14 @@ function inferType(options: Option[], answer: string[], stem: string): QuestionT
   }
 
   // No options
+  if (answer.length === 1) {
+    const normalized = answer[0].trim().toLowerCase();
+    const trueFalseAnswers = new Set([
+      "对", "错", "正确", "错误", "√", "×", "true", "false", "t", "f", "yes", "no", "是", "否",
+    ]);
+    if (trueFalseAnswers.has(normalized)) return "true_false";
+  }
+
   if (BLANK_RE.test(stem)) {
     return "fill_blank";
   }

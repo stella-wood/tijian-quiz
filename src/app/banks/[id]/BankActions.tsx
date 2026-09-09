@@ -2,14 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-
-interface UnfinishedSession {
-  id: string;
-  mode: string;
-  currentIndex: number;
-  totalCount: number;
-  startedAt: string;
-}
+import { createSession, getUnfinishedSessions } from "@/features/practice/client";
+import type { PracticeMode, UnfinishedSessionDto } from "@/features/practice/contracts";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 
 export function BankActions({
   bankId,
@@ -20,37 +15,30 @@ export function BankActions({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
-  const [unfinished, setUnfinished] = useState<UnfinishedSession | null>(null);
+  const [unfinished, setUnfinished] = useState<UnfinishedSessionDto | null>(null);
   const [checking, setChecking] = useState(true);
   const [dismissed, setDismissed] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/banks/${bankId}/sessions/unfinished`)
-      .then((res) => res.json())
+    getUnfinishedSessions(bankId)
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0 && !data[0].error) {
+        if (data.length > 0) {
           setUnfinished(data[0]);
         }
       })
-      .catch(() => {})
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "检查练习进度失败"))
       .finally(() => setChecking(false));
   }, [bankId]);
 
-  async function startPractice(mode: string) {
+  async function startPractice(mode: PracticeMode) {
     setLoading(mode);
     try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bankId, mode }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        alert(err.error || "创建练习失败");
-        return;
-      }
-      const session = await res.json();
+      setError("");
+      const session = await createSession(bankId, mode);
       router.push(`/practice/${session.id}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "创建练习失败");
     } finally {
       setLoading(null);
     }
@@ -100,14 +88,16 @@ export function BankActions({
     );
   }
 
-  const buttons = [
+  const buttons: { mode: PracticeMode; label: string; desc: string }[] = [
     { mode: "sequential", label: "顺序练习", desc: "按题目顺序依次作答" },
     { mode: "random", label: "随机练习", desc: "乱序抽取题目" },
     { mode: "wrong", label: "错题重练", desc: "只练错过的题目" },
   ];
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div>
+      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
+      <div className="flex flex-wrap gap-3">
       {buttons.map((btn) => (
         <button
           key={btn.mode}
@@ -121,6 +111,7 @@ export function BankActions({
           <div className="text-xs text-gray-500 mt-0.5">{btn.desc}</div>
         </button>
       ))}
+      </div>
     </div>
   );
 }

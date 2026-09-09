@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { bankService, questionService } from "@/server/services";
+import { AppError } from "@/features/errors";
 import { BankActions } from "./BankActions";
 import { BankQuestionsList } from "./BankQuestionsList";
 
@@ -12,16 +13,14 @@ export default async function BankDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const bank = await prisma.questionBank.findUnique({
-    where: { id },
-    include: {
-      questions: { orderBy: { orderIndex: "asc" } },
-    },
-  });
-
-  if (!bank) {
-    notFound();
+  let bank;
+  try {
+    bank = await bankService.get(id);
+  } catch (error) {
+    if (error instanceof AppError && error.code === "NOT_FOUND") notFound();
+    throw error;
   }
+  const questions = await questionService.listByBank(id);
 
   return (
     <div>
@@ -31,17 +30,17 @@ export default async function BankDetailPage({
             ← 返回题库列表
           </Link>
           <h1 className="text-xl font-bold">{bank.title}</h1>
-          <p className="text-sm text-gray-500">{bank.questions.length} 道题目</p>
+          <p className="text-sm text-gray-500">{questions.length} 道题目</p>
         </div>
       </div>
 
-      <BankActions bankId={bank.id} questionCount={bank.questions.length} />
+      <BankActions bankId={bank.id} questionCount={questions.length} />
 
-      {bank.questions.length === 0 ? (
+      {questions.length === 0 ? (
         <p className="text-center py-10 text-gray-500">暂无题目</p>
       ) : (
         <div className="mt-6">
-          <BankQuestionsList questions={bank.questions} />
+          <BankQuestionsList questions={questions} />
         </div>
       )}
     </div>

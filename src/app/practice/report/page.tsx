@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { requestJson } from "@/features/http-client";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 
 interface AnswerRecord {
   id: string;
@@ -33,28 +35,27 @@ function ReportContent() {
 
   const [report, setReport] = useState<SessionReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!sessionId) {
       router.push("/");
       return;
     }
-    fetch(`/api/sessions/${sessionId}`)
-      .then((res) => res.json())
+    requestJson<SessionReport>(`/api/sessions/${sessionId}`)
       .then((data) => {
-        if (data.error) throw new Error(data.error);
         setReport(data);
       })
-      .catch(() => router.push("/"))
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "加载报告失败"))
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [router, sessionId]);
 
   if (loading) {
     return <div className="text-center py-20 text-gray-500">加载中...</div>;
   }
 
   if (!report) {
-    return null;
+    return error ? <ErrorBanner message={error} /> : null;
   }
 
   const accuracy =

@@ -1,40 +1,22 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { BankIdSchema } from "@/features/banks/contracts";
+import { parseWithSchema, routeError } from "@/server/http";
+import { bankService } from "@/server/services";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params;
-    const bank = await prisma.questionBank.findUnique({
-      where: { id },
-      include: { _count: { select: { questions: true } } },
-    });
-    if (!bank) {
-      return NextResponse.json({ error: "题库不存在" }, { status: 404 });
-    }
-    return NextResponse.json(bank);
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "服务器内部错误" }, { status: 500 });
+    const id = parseWithSchema(BankIdSchema, (await params).id);
+    return NextResponse.json(await bankService.get(id));
+  } catch (error) {
+    return routeError(error);
   }
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params;
-    const bank = await prisma.questionBank.findUnique({ where: { id } });
-    if (!bank) {
-      return NextResponse.json({ error: "题库不存在" }, { status: 404 });
-    }
-    await prisma.questionBank.delete({ where: { id } });
-    return NextResponse.json({ success: true });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "服务器内部错误" }, { status: 500 });
+    const id = parseWithSchema(BankIdSchema, (await params).id);
+    return NextResponse.json(await bankService.delete(id));
+  } catch (error) {
+    return routeError(error);
   }
 }

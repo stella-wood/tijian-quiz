@@ -28,16 +28,13 @@ if not exist "node_modules\" (
     echo [INFO] Dependencies installed.
 )
 
-REM Create database if needed
-if not exist "prisma\dev.db" (
-    echo [INFO] Creating database...
-    call npx prisma db push
-    if %errorlevel% neq 0 (
-        echo [ERROR] Database creation failed
-        pause
-        exit /b
-    )
-    echo [INFO] Database created.
+REM Prepare or migrate database without discarding existing data
+echo [INFO] Checking database migrations...
+call npm run db:prepare
+if %errorlevel% neq 0 (
+    echo [ERROR] Database migration failed. Existing data was not reset.
+    pause
+    exit /b
 )
 
 echo [INFO] Starting server...

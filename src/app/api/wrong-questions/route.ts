@@ -1,26 +1,14 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { BankIdSchema } from "@/features/banks/contracts";
+import { parseWithSchema, routeError } from "@/server/http";
+import { practiceService } from "@/server/services";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const bankId = searchParams.get("bankId");
-
-    const where = bankId ? { question: { bankId } } : {};
-
-    const wrongQuestions = await prisma.wrongQuestion.findMany({
-      where,
-      include: {
-        question: {
-          include: { bank: { select: { id: true, title: true } } },
-        },
-      },
-      orderBy: { lastWrongAt: "desc" },
-    });
-
-    return NextResponse.json(wrongQuestions);
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "服务器内部错误" }, { status: 500 });
+    const value = new URL(request.url).searchParams.get("bankId");
+    const bankId = value ? parseWithSchema(BankIdSchema, value) : undefined;
+    return NextResponse.json(await practiceService.listWrong(bankId));
+  } catch (error) {
+    return routeError(error);
   }
 }
