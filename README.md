@@ -1,6 +1,10 @@
-# 智能题库刷题系统
+# 题笺 · Tijian Quiz
 
-一个本地优先的智能题库工具：将 TXT/Markdown 文档转换为结构化题库，支持人工校对、顺序/随机/错题练习、练习报告和完整数据备份。
+将 TXT/Markdown 中文题库快速变成可练习的本地题库。
+
+A local-first practice tool for Chinese TXT and Markdown question banks.
+
+题笺支持确定性文本解析、人工校对、顺序/随机/错题练习、练习报告和完整数据备份。
 
 > 当前版本面向本地单用户使用。代码可以公开，但在增加认证、资源权限和限流前，请勿将应用直接部署为公网多用户服务。
 
